@@ -1,0 +1,526 @@
+﻿<html>
+<head>
+<meta http-equiv="X-UA-Compatible" content="IE=9">
+<title>Tpei聊天机器人工作室</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<HTA:APPLICATION ID="oBot"
+  APPLICATIONNAME="TpeiBotStudio"
+  BORDER="thin" BORDERSTYLE="normal"
+  CAPTION="yes" ICON=""
+  MAXIMIZEBUTTON="yes" MINIMIZEBUTTON="yes"
+  SHOWINTASKBAR="yes" SINGLEINSTANCE="yes"
+  SYSMENU="yes" VERSION="1.0"
+  WINDOWSTATE="normal" INNERBORDER="no"
+  SCROLL="no" SCROLLFLAT="no" SELECTION="no"
+  CONTEXTMENU="yes" NAVIGABLE="yes">
+<style>
+  *{box-sizing:border-box}
+  html,body{height:100%;width:100%;overflow:hidden;margin:0;padding:0}
+  body{margin:0;font-family:"Microsoft YaHei",SimSun;background:#1e2229;color:#dde1e8;font-size:13px;overflow:hidden}
+  #wrap{width:100%;height:100%}
+  /* 左栏：机器人列表 */
+  #left{position:absolute;left:0;top:0;width:230px;height:100%;background:#171a20;border-right:1px solid #2c313a}
+  #left h3{margin:0;padding:12px;font-size:14px;color:#8ab4f8;border-bottom:1px solid #2c313a}
+  #botlist{position:absolute;top:44px;left:0;right:0;bottom:88px;overflow-y:auto}
+  .botitem{padding:9px 12px;cursor:pointer;border-bottom:1px solid #22262e}
+  .botitem:hover{background:#232833}
+  .botitem.on{background:#2b3a55;border-left:3px solid #8ab4f8}
+  .botname{font-weight:bold}
+  .botdesc{color:#8a919e;font-size:11px;margin-top:2px}
+  #leftbtns{position:absolute;bottom:0;left:0;right:0;padding:10px;border-top:1px solid #2c313a}
+  button{background:#2f6fdb;color:#fff;border:0;padding:6px 12px;border-radius:3px;cursor:pointer;font-family:inherit;font-size:12px}
+  button:hover{background:#3d7de8}
+  button.gray{background:#3a404c}
+  button.green{background:#2e8b57}
+  button.red{background:#a04040}
+  button.wide{width:100%;margin-top:6px}
+  /* 右栏 */
+  #right{position:absolute;left:230px;top:0;right:0;bottom:0}
+  #header{position:absolute;top:0;left:0;right:0;height:44px;background:#171a20;border-bottom:1px solid #2c313a;padding:0 16px;line-height:44px;font-weight:bold}
+  #tabs{position:absolute;right:12px;top:0}
+  #tabs span{display:inline-block;padding:0 14px;line-height:42px;cursor:pointer;color:#8a919e}
+  #tabs span.on{color:#8ab4f8;border-bottom:2px solid #8ab4f8}
+  /* 聊天页 */
+  #chatpage{display:none;position:absolute;top:44px;left:0;right:0;bottom:0;overflow:hidden}
+  #msgs{position:relative;width:100%;overflow-y:auto;padding:14px}
+  .row{margin-bottom:10px;clear:both;width:100%}
+  .who{font-size:11px;color:#8a919e;margin-bottom:3px}
+  .bub{display:inline-block;max-width:70%;padding:8px 12px;border-radius:8px;word-wrap:break-word}
+  .bl{background:#2c313a;float:left}
+  .br{background:#2f6fdb;float:right}
+  #inputbar{position:relative;width:100%;height:112px;background:#171a20;border-top:1px solid #2c313a;padding:10px}
+  #txtin{width:100%;height:44px;background:#232833;color:#dde1e8;border:1px solid #3a404c;border-radius:4px;font-family:inherit;font-size:13px;resize:none}
+  /* 脚本页 */
+  #cfgpage{display:none;position:absolute;top:44px;left:0;right:0;bottom:0;overflow-y:auto;padding:16px}
+  .card{background:#171a20;border:1px solid #2c313a;border-radius:6px;padding:14px;margin-bottom:14px}
+  .card h4{margin:0 0 10px;color:#8ab4f8;font-size:13px}
+  textarea.cfg{width:98%;height:120px;background:#232833;color:#dde1e8;border:1px solid #3a404c;border-radius:4px;font-family:Consolas,monospace;font-size:12px;resize:vertical}
+  input.cfg{width:60px;background:#232833;color:#dde1e8;border:1px solid #3a404c;border-radius:4px;padding:4px}
+  .hint{color:#8a919e;font-size:11px;margin-top:8px;line-height:1.6}
+  #toast{position:absolute;bottom:110px;left:50%;margin-left:-80px;background:#2e8b57;color:#fff;padding:6px 18px;border-radius:4px;display:none}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="left">
+    <h3>我的机器人</h3>
+    <div id="botlist"></div>
+    <div id="leftbtns">
+      <button class="wide" onclick="newBot()">+ 新建机器人</button>
+      <button class="wide gray" onclick="delBot()">删除当前机器人</button>
+    </div>
+  </div>
+  <div id="right">
+    <div id="header"><span id="hdTitle">未选择机器人</span>
+      <div id="tabs">
+        <span id="tabChat" class="on" onclick="switchTab('chat')">聊天</span>
+        <span id="tabCfg" onclick="switchTab('cfg')">脚本设置</span>
+      </div>
+    </div>
+
+    <div id="chatpage">
+      <table id="chattbl" style="width:100%;height:100%;border-collapse:collapse;table-layout:fixed">
+        <tr>
+          <td style="vertical-align:top;padding:0;background:#1e2229">
+            <div id="msgs"></div>
+          </td>
+        </tr>
+        <tr>
+          <td style="height:112px;padding:0">
+            <div id="inputbar">
+              <textarea id="txtin" placeholder="输入消息，回车发送（Shift+回车换行）"></textarea>
+              <button onclick="sendMsg()">发送</button>
+              <button class="green" onclick="toggleRun()" id="btnRun">启动机器人</button>
+              <button class="gray" onclick="clearChat()">清空记录</button>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <div id="cfgpage">
+      <div class="card">
+        <h4>机器人台词规则（关键词触发回复）</h4>
+        <textarea id="cfgRules" class="cfg" spellcheck="false"></textarea>
+        <div class="hint">格式：每行一条 → <b>关键词|回复1||回复2||回复3</b><br>
+        消息里包含该关键词就触发，多条回复随机抽一条。示例：<br>
+        你好|你好呀！||哈喽，有什么事吗？<br>
+        天气|我今天不出门，天气随意啦</div>
+      </div>
+      <div class="card">
+        <h4>兜底回复（没匹配到关键词时用，每行一条随机抽）</h4>
+        <textarea id="cfgFallback" class="cfg" spellcheck="false"></textarea>
+      </div>
+      <div class="card">
+        <h4>定时自动发言</h4>
+        间隔 <input id="cfgEvery" class="cfg" type="text" value="30"> 秒，启用 <input id="cfgAuto" type="checkbox">
+        <textarea id="cfgAutoMsgs" class="cfg" spellcheck="false" style="margin-top:8px"></textarea>
+        <div class="hint">每行一条，机器人会按间隔随机抽一条自动发到当前聊天。</div>
+      </div>
+
+      <div class="card">
+        <h4>AI 大脑（免费接口，不用也能跑关键词版）</h4>
+        <div style="line-height:2.2">
+          启用 <input id="aiOn" type="checkbox" style="vertical-align:middle" onchange="saveCfg()">
+          <span class="hint" style="display:inline">（勾选后机器人走智能对话，失败会自动退回关键词回复）</span><br>
+          接口地址 <input id="aiUrl" class="cfg" style="width:70%" type="text" value="https://open.bigmodel.cn/api/paas/v4/chat/completions" onchange="saveCfg()"><br>
+          模型名 <input id="aiModel" class="cfg" style="width:200px" type="text" value="glm-4-flash" onchange="saveCfg()">
+          <span class="hint" style="display:inline">（glm-4-flash 永久免费；glm-4.7-flash 写代码更强，也免费）</span><br>
+          API Key <input id="aiKey" class="cfg" style="width:70%" type="text" placeholder="在这里粘贴密钥，粘完点右边测试" onchange="saveCfg()">
+          <button class="green" onclick="testConn()">测试连接</button>
+        </div>
+        <div style="margin-top:10px">机器人人设（决定它说话的性格）</div>
+        <textarea id="aiPersona" class="cfg" style="height:70px" spellcheck="false" onchange="saveCfg()"></textarea>
+      </div>
+      <button class="green" onclick="saveCfg()">保存脚本设置</button>
+      <span class="hint">保存后立即生效，配置存在本机文件里，关掉重开不丢。</span>
+    </div>
+
+    <div id="toast"></div>
+<div id="errbox" style="position:absolute;left:0;right:0;bottom:0;top:0;background:#1e2229;z-index:99;display:none;padding:20px;font-family:Consolas,monospace;color:#ff9999;overflow:auto;white-space:pre-wrap"></div>
+  </div>
+</div>
+
+<script language="javascript">
+// ================= 数据层 =================
+var DATA_FILE = (function(){
+  var p = unescape(location.pathname).replace(/\//g, "\\");
+  if(p.charAt(0) === "\\") p = p.substring(1);
+  return p.substring(0, p.lastIndexOf("\\")+1) + "tpei_botdata.json";
+})();
+var bots = [];          // [{name,color,rules:[[kw,[r1,r2]],...],fallback:[],auto:bool,every:30,autoMsgs:[]}]
+var cur = -1;           // 当前机器人索引
+var running = false;    // 是否已启动
+var chatLog = {};       // name -> [{who,txt}]
+var autoTimer = null;
+
+function load(){
+  try{
+    var st = new ActiveXObject("ADODB.Stream");
+    st.Type = 2; st.Charset = "utf-8"; st.Open();
+    st.LoadFromFile(DATA_FILE);
+    var txt = st.ReadText(); st.Close();
+    var o = JSON.parse(txt);
+    bots = o.bots || []; chatLog = o.chatLog || {};
+    for(var k=0;k<bots.length;k++) bots[k] = defaults(bots[k]);
+  }catch(e){ bots = []; chatLog = {}; }
+  if(bots.length === 0){ seedDemo(); }
+}
+function save(){
+  try{
+    var st = new ActiveXObject("ADODB.Stream");
+    st.Type = 2; st.Charset = "utf-8"; st.Open();
+    st.WriteText(JSON.stringify({bots:bots,chatLog:chatLog}));
+    st.SaveToFile(DATA_FILE, 2); st.Close();
+  }catch(e){ toast("保存失败:"+e.message); }
+}
+function defaults(b){
+  if(b.aiOn === undefined) b.aiOn = false;
+  if(b.aiUrl === undefined) b.aiUrl = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
+  if(b.aiModel === undefined) b.aiModel = "glm-4-flash";
+  if(b.aiKey === undefined) b.aiKey = "";
+  if(b.persona === undefined) b.persona = "";
+  return b;
+}
+function seedDemo(){
+  bots.push({name:"小助手",color:"#2f6fdb",
+    rules:[["你好",["你好呀！","哈喽，找我什么事？"]],["在吗",["在的在的，说吧"]],["晚安",["晚安，好梦～"]]],
+    fallback:["嗯嗯","让我想想…","这个话题不错"],auto:true,every:45,
+    autoMsgs:["今天也要加油呀！","有人吗，聊聊天？","刚刚看到个有意思的事"]});
+  bots.push({name:"毒舌君",color:"#a04040",
+    rules:[["笨",["你才笨呢！"]],["哈哈",["笑什么笑，说的就是你"]]],
+    fallback:["切…","行吧行吧"],auto:false,every:30,autoMsgs:[]});
+}
+
+// ================= 界面 =================
+function el(id){ return document.getElementById(id); }
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>"); }
+function toast(t){ el("toast").innerText=t; el("toast").style.display="block"; setTimeout(function(){el("toast").style.display="none";},1500); }
+function rnd(a){ return a[Math.floor(Math.random()*a.length)]; }
+
+function renderBots(){
+  var h="", i;
+  for(i=0;i<bots.length;i++){
+    h += '<div class="botitem'+(i===cur?" on":"")+'" onclick="pick('+i+')">'
+      + '<span style="display:inline-block;width:10px;height:10px;border-radius:5px;background:'+bots[i].color+';margin-right:6px"></span>'
+      + '<span class="botname">'+esc(bots[i].name)+'</span>'
+      + '<div class="botdesc">规则 '+bots[i].rules.length+' 条'
+      + (bots[i].auto ? ' · 自动发言' : '')+'</div></div>';
+  }
+  el("botlist").innerHTML = h;
+  el("hdTitle").innerHTML = cur<0 ? "未选择机器人" : esc(bots[cur].name) + " <span style='font-size:11px;color:#8a919e;font-weight:normal'>（机器人工作室 · 本地模拟，不连接任何社交平台）</span>";
+}
+function pick(i){ cur=i; renderBots(); renderChat(); fillCfg(); switchTab('chat'); }
+function newBot(){
+  var n = prompt("给机器人起个名字：","机器人"+(bots.length+1));
+  if(!n) return;
+  bots.push({name:n,color:["#2f6fdb","#2e8b57","#a08840","#7a4fa0","#3a9a9a"][bots.length%5],
+    rules:[],fallback:["…"],auto:false,every:30,autoMsgs:[]});
+  cur = bots.length-1; save(); renderBots(); renderChat(); fillCfg(); switchTab('cfg');
+}
+function delBot(){
+  if(cur<0) return;
+  if(!confirm("确定删除机器人「"+bots[cur].name+"」及其聊天记录？")) return;
+  bots.splice(cur,1); cur=-1;
+  save(); renderBots(); el("msgs").innerHTML=""; el("hdTitle").innerText="未选择机器人";
+}
+
+// ================= 聊天 =================
+function switchTab(t){
+  layout();
+  el("chatpage").style.display = t==="chat"?"block":"none";
+  el("cfgpage").style.display = t==="cfg"?"block":"none";
+  el("tabChat").className = t==="chat"?"on":"";
+  el("tabCfg").className = t==="cfg"?"on":"";
+}
+function renderChat(){
+  if(cur<0){ return; }
+  var h="", i, m = chatLog[bots[cur].name]||[];
+  for(i=0;i<m.length;i++){
+    var left = m[i].who !== "我";
+    h += '<div class="row"><div class="who" style="'+(left?"text-align:left":"text-align:right")+'">'+esc(m[i].who)+'</div>'
+      + '<div class="bub '+(left?"bl":"br")+'">'+esc(m[i].txt)+'</div></div>';
+  }
+  el("msgs").innerHTML = h;
+  el("msgs").scrollTop = el("msgs").scrollHeight;
+}
+function push(who,txt){
+  if(cur<0) return;
+  var k = bots[cur].name;
+  if(!chatLog[k]) chatLog[k]=[];
+  chatLog[k].push({who:who,txt:txt});
+  save(); renderChat();
+}
+function sendMsg(){
+  if(cur<0){ toast("请先选择或新建一个机器人"); return; }
+  var t = el("txtin").value.replace(/^\s+|\s+$/g,"");
+  if(!t) return;
+  el("txtin").value = "";
+  push("我", t);
+  botReply(t);
+}
+function botReply(userTxt){
+  var b = bots[cur];
+  if(b.aiOn && b.aiKey){ askAI(userTxt); return; }
+  ruleReply(userTxt);
+}
+function ruleReply(userTxt){
+  var b = bots[cur], i, replies=[];
+  for(i=0;i<b.rules.length;i++){
+    if(b.rules[i][0] && userTxt.indexOf(b.rules[i][0])>=0){ replies = b.rules[i][1]; break; }
+  }
+  var ans = replies.length ? rnd(replies) : (b.fallback.length ? rnd(b.fallback) : "\u2026");
+  setTimeout(function(){ push(b.name, ans); }, 400 + Math.floor(Math.random()*900));
+}
+function askAI(userTxt){
+  var b = bots[cur];
+  push(b.name, "\u6b63\u5728\u601d\u8003\u2026");   // 正在思考占位
+  var msgs = [{role:"system", content: b.persona || ("你是" + b.name + "，请用自然口语简短回复。")}];
+  var log = chatLog[b.name] || [];
+  var start = (log.length > 12) ? log.length - 12 : 0;
+  for(var i=start;i<log.length;i++){
+    if(log[i].txt === "\u6b63\u5728\u601d\u8003\u2026") continue;
+    msgs.push({role: (log[i].who === "我" ? "user" : "assistant"), content: log[i].txt});
+  }
+  if(msgs.length < 2 || msgs[msgs.length-1].content !== userTxt)
+    msgs.push({role:"user", content: userTxt});
+  var body = JSON.stringify({model: b.aiModel, messages: msgs, temperature: 0.8});
+  httpPost(b.aiUrl, body, b.aiKey, function(ok, status, text){
+    removeThinking(b.name);
+    if(ok){
+      try{
+        var arr = JSON.parse(text);
+        if(arr.choices && arr.choices[0] && arr.choices[0].message){
+          push(b.name, arr.choices[0].message.content);
+        } else if(arr.error){
+          push(b.name, "[接口报错] " + (arr.error.message || JSON.stringify(arr.error)));
+        } else {
+          push(b.name, "[未知返回] " + text.substring(0,150));
+        }
+      }catch(pe){ push(b.name, "[解析失败] " + text.substring(0,150)); }
+    } else {
+      push(b.name, "[AI失败 " + status + "] " + text.substring(0,150) + "  ——已自动退回关键词模式");
+    }
+  });
+}
+function httpPost(url, body, key, cb){
+  // 方案1：WinHTTP（不受IE安全区域限制，首选）
+  try{
+    var w = new ActiveXObject("WinHttp.WinHttpRequest.5.1");
+    w.SetTimeouts(5000, 5000, 15000, 30000);
+    w.Open("POST", url, true);
+    w.SetRequestHeader("Content-Type", "application/json");
+    w.SetRequestHeader("Authorization", "Bearer " + key);
+    w.Send(body);
+    pollWinHttp(w, cb);
+    return;
+  }catch(e1){
+    lastHttpErr = String(e1.description || e1.message || e1);
+  }
+  // 方案2：MSXML2（事件模型标准，可能被区域策略拦截）
+  var prog = ["MSXML2.ServerXMLHTTP.6.0", "MSXML2.XMLHTTP"];
+  for(var t=0;t<prog.length;t++){
+    try{
+      (function(idx){
+        var o = new ActiveXObject(prog[idx]);
+        o.open("POST", url, true);
+        o.setRequestHeader("Content-Type", "application/json");
+        o.setRequestHeader("Authorization", "Bearer " + key);
+        var finished = false;
+        o.onreadystatechange = function(){
+          if(finished || o.readyState !== 4) return;
+          finished = true;
+          if(o.status >= 200 && o.status < 300) cb(true, o.status, o.responseText);
+          else cb(false, o.status, o.responseText || ("组件=" + prog[idx]));
+        };
+        o.send(body);
+        okSent = true;
+      })(t);
+      if(okSent) return;
+    }catch(e2){
+      lastHttpErr = String(e2.description || e2.message || e2);
+    }
+  }
+  cb(false, "全部组件失败", lastHttpErr);
+}
+var okSent = false, lastHttpErr = "";
+function pollWinHttp(w, cb){
+  var tries = 0;
+  var iv = setInterval(function(){
+    tries++;
+    var ready = false;
+    try{ ready = w.WaitForResponse(1); }catch(e){}
+    if(ready || tries > 150){
+      clearInterval(iv);
+      var st = 0, txt = "";
+      try{ st = w.Status; txt = w.ResponseText; }
+      catch(e2){ txt = String(e2.description || e2.message || e2); }
+      if(st >= 200 && st < 300) cb(true, st, txt);
+      else cb(false, st, txt || ("状态码为空，可能请求被拦截"));
+    }
+  }, 200);
+}
+function testConn(){
+  var url = el("aiUrl").value.replace(/^\s+|\s+$/g,"");
+  var key = el("aiKey").value.replace(/^\s+|\s+$/g,"");
+  var mdl = el("aiModel").value.replace(/^\s+|\s+$/g,"") || "glm-4-flash";
+  if(!key){ alert("请先粘贴 API Key"); return; }
+  saveCfg();
+  alert("已保存，正在测试连接...");
+  httpPost(url, JSON.stringify({model:mdl, messages:[{role:"user",content:"只回复两个字：收到"}], temperature:0.1}), key, function(ok, status, text){
+    alert(ok
+      ? ("连接成功！状态码 " + status + "\n模型回复：" + text.substring(0,200))
+      : ("连接失败\n状态码: " + status + "\n详情: " + text.substring(0,300)));
+  });
+}
+function failAI(){ ruleReply(""); }
+function removeThinking(botName){
+  var log = chatLog[botName] || [];
+  for(var i=log.length-1;i>=0;i--){
+    if(log[i].txt === "\u6b63\u5728\u601d\u8003\u2026"){ log.splice(i,1); break; }
+  }
+  renderChat();
+}
+function toggleRun(){
+  if(cur<0){ toast("请先选择机器人"); return; }
+  running = !running;
+  el("btnRun").innerText = running ? "停止机器人" : "启动机器人";
+  if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
+  if(running){
+    toast(bots[cur].name + " 已启动");
+    autoTimer = setInterval(autoSpeak, 5000);
+  } else toast("已停止");
+}
+function autoSpeak(){
+  if(!running || cur<0) return;
+  var b = bots[cur];
+  if(!b.auto || !b.autoMsgs.length) return;
+  var now = new Date().getTime();
+  if(!window._lastAuto) window._lastAuto = {};
+  var last = window._lastAuto[b.name]||0;
+  if(now - last < b.every*1000) return;
+  window._lastAuto[b.name] = now;
+  push(b.name, rnd(b.autoMsgs));
+}
+function clearChat(){
+  if(cur<0) return;
+  chatLog[bots[cur].name]=[]; save(); renderChat();
+}
+
+// ================= 脚本编辑 =================
+function fillCfg(){
+  if(cur<0) return;
+  var b = bots[cur], i, lines=[];
+  for(i=0;i<b.rules.length;i++)
+    lines.push(b.rules[i][0] + "|" + b.rules[i][1].join("||"));
+  el("cfgRules").value = lines.join("\n");
+  el("cfgFallback").value = b.fallback.join("\n");
+  el("cfgEvery").value = b.every;
+  el("cfgAuto").checked = !!b.auto;
+  el("cfgAutoMsgs").value = b.autoMsgs.join("\n");
+  el("aiOn").checked = !!b.aiOn;
+  el("aiUrl").value = b.aiUrl;
+  el("aiModel").value = b.aiModel;
+  el("aiKey").value = b.aiKey;
+  el("aiPersona").value = b.persona;
+}
+function saveCfg(){
+  if(cur<0){ toast("请先选择机器人"); return; }
+  var b = bots[cur], i, lines, parts;
+  // 规则
+  lines = el("cfgRules").value.split("\n"); b.rules=[];
+  for(i=0;i<lines.length;i++){
+    lines[i] = lines[i].replace(/^\s+|\s+$/g,"");
+    if(!lines[i]) continue;
+    parts = lines[i].split("|");
+    if(parts.length>=2)
+      b.rules.push([parts[0].replace(/^\s+|\s+$/g,""), parts.slice(1).join("|").split("||")]);
+  }
+  // 兜底
+  b.fallback = [];
+  lines = el("cfgFallback").value.split("\n");
+  for(i=0;i<lines.length;i++){ lines[i]=lines[i].replace(/^\s+|\s+$/g,""); if(lines[i]) b.fallback.push(lines[i]); }
+  // 定时
+  var ev = parseInt(el("cfgEvery").value,10);
+  b.every = (ev>2 && ev<86400) ? ev : 30;
+  b.auto = el("cfgAuto").checked;
+  b.aiOn = el("aiOn").checked;
+  b.aiUrl = el("aiUrl").value.replace(/^\s+|\s+$/g,"");
+  b.aiModel = el("aiModel").value.replace(/^\s+|\s+$/g,"") || "glm-4-flash";
+  b.aiKey = el("aiKey").value.replace(/^\s+|\s+$/g,"");
+  b.persona = el("aiPersona").value;
+  b.autoMsgs = [];
+  lines = el("cfgAutoMsgs").value.split("\n");
+  for(i=0;i<lines.length;i++){ lines[i]=lines[i].replace(/^\s+|\s+$/g,""); if(lines[i]) b.autoMsgs.push(lines[i]); }
+  save(); renderBots(); toast("脚本已保存生效");
+}
+
+
+function layout(){
+  try{
+    var W = document.documentElement.clientWidth;
+    var H = document.documentElement.clientHeight;
+    if(!W || W < 100) W = 1000;
+    if(!H || H < 100) H = 600;
+    var L = el("left"), R = el("right"), CP = el("chatpage"), CF = el("cfgpage");
+    var RW = W - 230; if(RW < 200) RW = 200;
+    var bodyH = H - 44; if(bodyH < 120) bodyH = 120;
+
+    L.style.left="0px"; L.style.top="0px"; L.style.width="230px"; L.style.height=H+"px";
+    L.style.overflow="hidden";
+    el("botlist").style.height = (H - 44 - 92) + "px";
+    el("botlist").style.overflowY = "auto";
+
+    R.style.left="230px"; R.style.top="0px"; R.style.width=RW+"px"; R.style.height=H+"px";
+    R.style.overflow="hidden";
+
+    CP.style.top="44px"; CP.style.left="0px"; CP.style.width=RW+"px";
+    CP.style.height=bodyH+"px"; CP.style.overflow="hidden";
+    CF.style.top="44px"; CF.style.left="0px"; CF.style.width=RW+"px";
+    CF.style.height=bodyH+"px"; CF.style.overflowY="auto";
+
+    // 消息区：填满表格单元格并自带滚动条（高度由表格自动分配）
+    var msgWrap = el("msgs");
+    var availH = bodyH - 112;
+    if(availH < 80) availH = 80;
+    msgWrap.style.width="100%";
+    msgWrap.style.height=availH+"px";
+    msgWrap.style.overflowY="auto";
+    msgWrap.style.overflowX="hidden";
+
+    var ib = el("inputbar");
+    ib.style.position="relative"; ib.style.width="100%"; ib.style.height="112px";
+    ib.style.overflow="hidden"; ib.style.bottom="auto"; ib.style.top="auto"; ib.style.left="0px";
+    el("txtin").style.width="100%"; el("txtin").style.height="46px";
+  }catch(e){}
+}
+// ================= 初始化 =================
+function showErr(e){
+  el("errbox").style.display = "block";
+  el("errbox").innerText = "程序启动报错，请把这段内容发给开发者：\n\n" + (e && e.message ? e.message : e)
+    + "\n\n文件位置: " + DATA_FILE;
+}
+function init(){
+  try{
+    layout();
+    load();
+    renderBots();
+    if(bots.length > 0) pick(0);
+    switchTab("chat");
+    el("txtin").onkeydown = function(e){
+      e = e || window.event;
+      if((e.keyCode||e.which) === 13 && !e.shiftKey){
+        if(e.preventDefault) e.preventDefault(); else e.returnValue = false;
+        sendMsg();
+      }
+    };
+  }catch(err){ showErr(err); }
+}
+window.onerror = function(msg, url, ln){ el("errbox").style.display="block";
+  el("errbox").innerText = "运行错误:\n" + msg + "\n行号:" + ln; return true; };
+try{ window.resizeTo(1000, 680); }catch(e){}
+window.onresize = layout;
+setTimeout(layout, 60); setTimeout(layout, 300); setTimeout(layout, 900);
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>tpei的贪吃蛇游戏</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1d24; color: #e8e6e1;
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 16px; padding: 20px;
+  }
+  h1 { font-size: 22px; letter-spacing: 6px; font-weight: 600; color: #7ec8a9; }
+  .hud { display: flex; gap: 32px; font-size: 14px; color: #9aa0a6; }
+  .hud b { color: #e8e6e1; font-size: 18px; margin-left: 6px; }
+  #wrap { position: relative; }
+  canvas {
+    background: #23262e; border: 2px solid #3a3f4b; border-radius: 8px;
+    display: block; touch-action: none;
+  }
+  #overlay {
+    position: absolute; inset: 0; border-radius: 8px;
+    background: rgba(20,22,28,.82); display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px; text-align: center;
+  }
+  #overlay.hidden { display: none; }
+  #overlay .title { font-size: 20px; font-weight: 600; }
+  #overlay .sub { font-size: 13px; color: #9aa0a6; line-height: 1.9; }
+  #overlay button {
+    margin-top: 4px; padding: 10px 32px; font-size: 15px; letter-spacing: 2px;
+    background: #7ec8a9; color: #1a1d24; border: none; border-radius: 6px;
+    cursor: pointer; font-weight: 600;
+  }
+  #overlay button:hover { background: #93d6ba; }
+  .tips { font-size: 12px; color: #6b7078; letter-spacing: 1px; }
+  #btn-dl {
+    padding: 8px 24px; font-size: 13px; letter-spacing: 1px;
+    background: transparent; color: #7ec8a9; border: 1px solid #3f6b58;
+    border-radius: 6px; cursor: pointer; transition: background .2s;
+  }
+  #btn-dl:hover { background: rgba(126,200,169,.12); }
+</style>
+</head>
+<body>
+  <h1>TPEI 的贪吃蛇</h1>
+  <div class="hud">
+    <span>得分<b id="score">0</b></span>
+    <span>最高<b id="best">0</b></span>
+  </div>
+  <div id="wrap">
+    <canvas id="cv" width="400" height="400"></canvas>
+    <div id="overlay">
+      <div class="title" id="ov-title">准备开始</div>
+      <div class="sub" id="ov-sub">方向键 / WASD 控制移动<br>空格暂停 · 手机滑动操作</div>
+      <button id="btn-start">开始游戏</button>
+    </div>
+  </div>
+  <div class="tips">↑ ↓ ← → / W A S D 移动 · 空格 暂停 · 单文件游戏，可离线游玩</div>
+  <button id="btn-dl">⬇ 下载游戏（发给朋友即可玩）</button>
+
+<script>
+// 全局错误兜底：出错时显示在覆盖层，避免"点了没反应"却无从排查
+window.onerror = function (msg) {
+  const t = document.getElementById('ov-title'), s = document.getElementById('ov-sub');
+  if (t && s) { t.textContent = '出错了'; s.textContent = String(msg); }
+};
+(() => {
+  // 页面初始状态快照（DOM 未被 JS 修改前缓存），用于生成干净的下载副本
+  const SOURCE_HTML = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+  const btnDl = document.getElementById('btn-dl');
+  // iframe 嵌入时浏览器会拦截页面内触发的下载，给出明确提示
+  const inIframe = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+  btnDl.addEventListener('click', () => {
+    if (inIframe) {
+      const old = btnDl.textContent;
+      btnDl.textContent = '⚠ 预览面板禁止下载，请从聊天中的文件卡片保存';
+      setTimeout(() => { btnDl.textContent = old; }, 3500);
+      return;
+    }
+    const blob = new Blob([SOURCE_HTML], { type: 'text/html;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'tpei的贪吃蛇.html';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+
+  const GRID = 20, CELL = 400 / GRID;
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  const elScore = document.getElementById('score'), elBest = document.getElementById('best');
+  const overlay = document.getElementById('overlay');
+  const ovTitle = document.getElementById('ov-title'), ovSub = document.getElementById('ov-sub');
+  const btnStart = document.getElementById('btn-start');
+
+  let snake, dir, dirQueue, food, score, speed, timer, state; // state: idle | running | paused | over
+  // 沙箱 iframe 中 localStorage 可能抛 SecurityError，做安全封装
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 无持久化也能玩 */ } }
+  };
+  let best = +(store.get('snake_best') || 0);
+  elBest.textContent = best;
+
+  function reset() {
+    snake = [{x: 9, y: 10}, {x: 8, y: 10}, {x: 7, y: 10}];
+    dir = {x: 1, y: 0}; dirQueue = [];
+    score = 0; speed = 150; state = 'running';
+    elScore.textContent = 0;
+    placeFood();
+    overlay.classList.add('hidden');
+    clearInterval(timer);
+    timer = setInterval(tick, speed);
+    draw();
+  }
+
+  function placeFood() {
+    do {
+      food = { x: (Math.random() * GRID) | 0, y: (Math.random() * GRID) | 0 };
+    } while (snake.some(s => s.x === food.x && s.y === food.y));
+  }
+
+  function tick() {
+    if (dirQueue.length) {
+      const nd = dirQueue.shift();
+      // 防止 180 度回头
+      if (nd.x !== -dir.x || nd.y !== -dir.y) dir = nd;
+    }
+    const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+    // 撞墙 / 撞自己
+    const hitWall = head.x < 0 || head.x >= GRID || head.y < 0 || head.y >= GRID;
+    const hitSelf = snake.some((s, i) => i < snake.length - 1 && s.x === head.x && s.y === head.y);
+    if (hitWall || hitSelf) return gameOver();
+
+    snake.unshift(head);
+    if (head.x === food.x && head.y === food.y) {
+      score += 10;
+      elScore.textContent = score;
+      placeFood();
+      // 每吃 3 个加速一次，下限 70ms
+      if (score % 30 === 0 && speed > 70) {
+        speed -= 10;
+        clearInterval(timer);
+        timer = setInterval(tick, speed);
+      }
+    } else {
+      snake.pop();
+    }
+    draw();
+  }
+
+  function gameOver() {
+    state = 'over';
+    clearInterval(timer);
+    if (score > best) {
+      best = score;
+      store.set('snake_best', best);
+      elBest.textContent = best;
+    }
+    ovTitle.textContent = '游戏结束';
+    ovSub.innerHTML = `本局得分 <b style="color:#e8e6e1">${score}</b>${score >= best && score > 0 ? ' 🎉 新纪录！' : ''}<br>最高纪录 ${best}`;
+    btnStart.textContent = '再来一局';
+    overlay.classList.remove('hidden');
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, 400, 400);
+    // 网格
+    ctx.strokeStyle = 'rgba(255,255,255,.03)';
+    for (let i = 1; i < GRID; i++) {
+      ctx.beginPath(); ctx.moveTo(i * CELL, 0); ctx.lineTo(i * CELL, 400); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i * CELL); ctx.lineTo(400, i * CELL); ctx.stroke();
+    }
+    // 食物
+    ctx.fillStyle = '#e06c5a';
+    ctx.beginPath();
+    ctx.arc(food.x * CELL + CELL / 2, food.y * CELL + CELL / 2, CELL / 2 - 3, 0, Math.PI * 2);
+    ctx.fill();
+    // 蛇（头亮尾暗）
+    snake.forEach((s, i) => {
+      const t = i / snake.length;
+      ctx.fillStyle = i === 0 ? '#8fe3bd' : `rgba(126,200,169,${1 - t * 0.55})`;
+      const r = 4, x = s.x * CELL + 1, y = s.y * CELL + 1, w = CELL - 2;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x, y, w, w, r); else ctx.rect(x, y, w, w);
+      ctx.fill();
+    });
+    // 眼睛
+    const h = snake[0];
+    ctx.fillStyle = '#1a1d24';
+    const cx = h.x * CELL + CELL / 2, cy = h.y * CELL + CELL / 2;
+    const ex = dir.y !== 0 ? 4 : 2, ey = dir.x !== 0 ? 4 : 2;
+    ctx.beginPath(); ctx.arc(cx + dir.x * 4 + ex, cy + dir.y * 4 + ey, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + dir.x * 4 - ex, cy + dir.y * 4 - ey, 1.8, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function turn(x, y) {
+    if (state === 'running') dirQueue.push({ x, y });
+  }
+
+  document.addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k) || k === 'w' || k === 'a' || k === 's' || k === 'd') {
+      e.preventDefault();
+    }
+    if (k === 'arrowup' || k === 'w') turn(0, -1);
+    else if (k === 'arrowdown' || k === 's') turn(0, 1);
+    else if (k === 'arrowleft' || k === 'a') turn(-1, 0);
+    else if (k === 'arrowright' || k === 'd') turn(1, 0);
+    else if (k === ' ' && (state === 'running' || state === 'paused')) {
+      if (state === 'running') {
+        state = 'paused'; clearInterval(timer);
+        ovTitle.textContent = '已暂停'; ovSub.textContent = '按空格或点击按钮继续';
+        btnStart.textContent = '继续';
+        overlay.classList.remove('hidden');
+      } else {
+        state = 'running'; overlay.classList.add('hidden');
+        timer = setInterval(tick, speed);
+      }
+    }
+  });
+
+  // 触屏滑动
+  let tx = 0, ty = 0;
+  cv.addEventListener('touchstart', e => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: true });
+  cv.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
+    if (Math.abs(dx) < 20 && Math.abs(dy) < 20) return;
+    if (Math.abs(dx) > Math.abs(dy)) turn(dx > 0 ? 1 : -1, 0);
+    else turn(0, dy > 0 ? 1 : -1);
+  }, { passive: true });
+
+  btnStart.addEventListener('click', () => {
+    if (state === 'paused') {
+      state = 'running'; overlay.classList.add('hidden');
+      timer = setInterval(tick, speed);
+    } else {
+      reset();
+    }
+  });
+
+  // 初始画面
+  snake = [{x: 9, y: 10}, {x: 8, y: 10}, {x: 7, y: 10}];
+  dir = {x: 1, y: 0}; food = {x: 14, y: 10}; state = 'idle';
+  draw();
+})();
+</script>
+</body>
+</html>
